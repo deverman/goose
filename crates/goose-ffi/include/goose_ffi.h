@@ -12,6 +12,25 @@
 #include <stdbool.h>
 
 /*
+ Role enum for message participants
+ */
+enum goose_MessageRole {
+  /*
+   User message role
+   */
+  goose_MessageRole_User = 0,
+  /*
+   Assistant message role
+   */
+  goose_MessageRole_Assistant = 1,
+  /*
+   System message role
+   */
+  goose_MessageRole_System = 2,
+};
+typedef uint32_t goose_MessageRole;
+
+/*
  Provider Type enumeration
  Currently only Databricks is supported
  */
@@ -53,6 +72,43 @@ typedef struct goose_ProviderConfigFFI {
   const char *model_name;
   const char *host;
 } goose_ProviderConfigFFI;
+
+/*
+ Completion response structure
+
+ - content: JSON string containing the completion response
+ - succeeded: true if the operation succeeded, false otherwise
+ - error_message: Error message if succeeded is false, NULL otherwise
+ */
+typedef struct goose_CompletionResponseFFI {
+  char *content;
+  bool succeeded;
+  char *error_message;
+} goose_CompletionResponseFFI;
+
+/*
+ Message structure for agent interactions
+
+ - role: Message role (User, Assistant, or System)
+ - content: Text content of the message
+ */
+typedef struct goose_MessageFFI {
+  goose_MessageRole role;
+  const char *content;
+} goose_MessageFFI;
+
+/*
+ Tool definition for use with completion
+
+ - name: Tool name
+ - description: Tool description
+ - input_schema_json: JSON schema for the tool's input parameters
+ */
+typedef struct goose_ToolFFI {
+  const char *name;
+  const char *description;
+  const char *input_schema_json;
+} goose_ToolFFI;
 
 /*
  Free an async result structure
@@ -141,5 +197,59 @@ char *goose_agent_send_message(goose_AgentPtr agent_ptr, const char *message);
  The string must not be used after calling this function.
  */
 void goose_free_string(char *s);
+
+/*
+ Free a completion response structure
+
+ This function frees the memory allocated for a CompletionResponseFFI structure,
+ including any content and error message it contains.
+
+ # Safety
+
+ The response pointer must be a valid pointer returned by a goose FFI function,
+ or NULL.
+ */
+void goose_free_completion_response(struct goose_CompletionResponseFFI *response);
+
+/*
+ Perform a completion request
+
+ This function sends a completion request to the specified provider and returns
+ the response.
+
+ # Parameters
+
+ - provider: Provider name (e.g., "databricks", "anthropic")
+ - model_name: Model name to use
+ - host: Provider host URL (NULL for default from environment variables)
+ - api_key: Provider API key (NULL for default from environment variables)
+ - system_preamble: System preamble text
+ - messages: Array of MessageFFI structures
+ - message_count: Number of messages in the array
+ - tools: Array of ToolFFI structures
+ - tool_count: Number of tools in the array
+ - check_tool_approval: Whether to check tool approvals
+
+ # Returns
+
+ A CompletionResponseFFI structure containing the response or error.
+ This must be freed with goose_free_completion_response when no longer needed.
+
+ # Safety
+
+ All string parameters must be valid C strings or NULL.
+ The messages array must contain valid MessageFFI structures.
+ The tools array must contain valid ToolFFI structures.
+ */
+struct goose_CompletionResponseFFI *goose_completion(const char *provider,
+                                                     const char *model_name,
+                                                     const char *host,
+                                                     const char *api_key,
+                                                     const char *system_preamble,
+                                                     const struct goose_MessageFFI *messages_ptr,
+                                                     uintptr_t message_count,
+                                                     const struct goose_ToolFFI *tools_ptr,
+                                                     uintptr_t tool_count,
+                                                     bool check_tool_approval);
 
 #endif // GOOSE_FFI_H
