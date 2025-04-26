@@ -1,17 +1,17 @@
-use chrono::Utc;
 use anyhow::Result;
+use chrono::Utc;
 use serde_json::Value;
 use std::collections::HashMap;
 
 use goose::message::Message;
 use goose::model::ModelConfig;
-use goose::providers::base::ProviderUsage;
-use goose::providers::create;
+use goose::providers::base::{Provider, ProviderUsage};
 use goose::providers::errors::ProviderError;
 use mcp_core::tool::Tool;
 
-use serde::{Deserialize, Serialize};
 use crate::prompt_template;
+use goose::providers::databricks::DatabricksProvider;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompletionResponse {
@@ -62,7 +62,12 @@ pub async fn completion(
     messages: &[Message],
     extensions: &[Extension]
 ) -> Result<CompletionResponse, ProviderError> {
-    let provider = create(provider, model_config).unwrap();
+ #   let provider = create(provider, model_config).unwrap();
+    let provider =
+    DatabricksProvider::from_params(std::env::var("DATABRICKS_HOST").ok().unwrap(),
+                                     std::env::var("DATABRICKS_TOKEN").ok().unwrap()
+                                    ,model_config)
+        .expect("Failed to create Databricks provider");
     let system_prompt = construct_system_prompt(system_preamble, extensions);
     // println!("\nSystem prompt: {}\n", system_prompt);
 
