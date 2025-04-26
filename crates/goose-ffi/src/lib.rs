@@ -648,7 +648,7 @@ pub unsafe extern "C" fn goose_completion(
 
         println!("goose_completion: Calling completion function with {} extensions", rust_extensions.len());
         let result = completion(
-            provider_str,
+            provider_str,  // Pass the provider parameter correctly
             model_config,
             system_preamble_str,
             &rust_messages,
