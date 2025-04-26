@@ -111,6 +111,21 @@ typedef struct goose_ToolFFI {
 } goose_ToolFFI;
 
 /*
+ Extension definition for use with completion
+
+ - name: Extension name
+ - instructions: Optional instructions for the extension (can be NULL)
+ - tools: Array of ToolFFI structures
+ - tool_count: Number of tools in the array
+ */
+typedef struct goose_ExtensionFFI {
+  const char *name;
+  const char *instructions;
+  const struct goose_ToolFFI *tools;
+  uintptr_t tool_count;
+} goose_ExtensionFFI;
+
+/*
  Free an async result structure
 
  This function frees the memory allocated for an AsyncResult structure,
@@ -226,9 +241,8 @@ void goose_free_completion_response(struct goose_CompletionResponseFFI *response
  - system_preamble: System preamble text
  - messages: Array of MessageFFI structures
  - message_count: Number of messages in the array
- - tools: Array of ToolFFI structures
- - tool_count: Number of tools in the array
- - check_tool_approval: Whether to check tool approvals
+ - extensions: Array of ExtensionFFI structures
+ - extension_count: Number of extensions in the array
 
  # Returns
 
@@ -239,7 +253,7 @@ void goose_free_completion_response(struct goose_CompletionResponseFFI *response
 
  All string parameters must be valid C strings or NULL.
  The messages array must contain valid MessageFFI structures.
- The tools array must contain valid ToolFFI structures.
+ The extensions array must contain valid ExtensionFFI structures.
  */
 struct goose_CompletionResponseFFI *goose_completion(const char *provider,
                                                      const char *model_name,
@@ -248,8 +262,7 @@ struct goose_CompletionResponseFFI *goose_completion(const char *provider,
                                                      const char *system_preamble,
                                                      const struct goose_MessageFFI *messages_ptr,
                                                      uintptr_t message_count,
-                                                     const struct goose_ToolFFI *tools_ptr,
-                                                     uintptr_t tool_count,
-                                                     bool check_tool_approval);
+                                                     const struct goose_ExtensionFFI *extensions_ptr,
+                                                     uintptr_t extension_count);
 
 #endif // GOOSE_FFI_H

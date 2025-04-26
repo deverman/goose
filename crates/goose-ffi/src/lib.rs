@@ -80,6 +80,20 @@ pub struct ToolFFI {
     pub input_schema_json: *const c_char,
 }
 
+/// Extension definition for use with completion
+///
+/// - name: Extension name
+/// - instructions: Optional instructions for the extension (can be NULL)
+/// - tools: Array of ToolFFI structures
+/// - tool_count: Number of tools in the array
+#[repr(C)]
+pub struct ExtensionFFI {
+    pub name: *const c_char,
+    pub instructions: *const c_char,
+    pub tools: *const ToolFFI,
+    pub tool_count: usize,
+}
+
 /// Message structure for agent interactions
 ///
 /// - role: Message role (User, Assistant, or System)
@@ -376,9 +390,8 @@ pub unsafe extern "C" fn goose_free_completion_response(response: *mut Completio
 /// - system_preamble: System preamble text
 /// - messages: Array of MessageFFI structures
 /// - message_count: Number of messages in the array
-/// - tools: Array of ToolFFI structures
-/// - tool_count: Number of tools in the array
-/// - check_tool_approval: Whether to check tool approvals
+/// - extensions: Array of ExtensionFFI structures
+/// - extension_count: Number of extensions in the array
 ///
 /// # Returns
 ///
@@ -389,7 +402,7 @@ pub unsafe extern "C" fn goose_free_completion_response(response: *mut Completio
 ///
 /// All string parameters must be valid C strings or NULL.
 /// The messages array must contain valid MessageFFI structures.
-/// The tools array must contain valid ToolFFI structures.
+/// The extensions array must contain valid ExtensionFFI structures.
 #[no_mangle]
 pub unsafe extern "C" fn goose_completion(
     provider: *const c_char,
@@ -399,9 +412,8 @@ pub unsafe extern "C" fn goose_completion(
     system_preamble: *const c_char,
     messages_ptr: *const MessageFFI,
     message_count: usize,
-    tools_ptr: *const ToolFFI,
-    tool_count: usize,
-    check_tool_approval: bool,
+    extensions_ptr: *const ExtensionFFI,
+    extension_count: usize,
 ) -> *mut CompletionResponseFFI {
     println!("goose_completion: Starting completion request");
     
@@ -513,66 +525,105 @@ pub unsafe extern "C" fn goose_completion(
         rust_messages.push(message);
     }
 
-    // Convert FFI tools to Rust tools
-    println!("goose_completion: Converting {} tools", tool_count);
-    let mut rust_tools = Vec::with_capacity(tool_count);
-    for i in 0..tool_count {
-        let ffi_tool = &*tools_ptr.add(i);
+    // Convert FFI extensions to Rust extensions
+    println!("goose_completion: Converting {} extensions", extension_count);
+    let mut rust_extensions = Vec::with_capacity(extension_count);
+    for i in 0..extension_count {
+        let ffi_extension = &*extensions_ptr.add(i);
         
-        // Check for null pointers
-        if ffi_tool.name.is_null() || ffi_tool.description.is_null() || ffi_tool.input_schema_json.is_null() {
-            println!("goose_completion: Tool {} has null fields", i);
-            return create_error_response("Error: Tool has null name, description, or input schema");
+        // Check for null name
+        if ffi_extension.name.is_null() {
+            println!("goose_completion: Extension {} has null name", i);
+            return create_error_response("Error: Extension name is null");
         }
         
-        // Convert name and description
-        let name = match CStr::from_ptr(ffi_tool.name).to_str() {
+        // Convert name
+        let name = match CStr::from_ptr(ffi_extension.name).to_str() {
             Ok(s) => s.to_string(),
             Err(_) => {
-                println!("goose_completion: Tool {} has invalid name string", i);
-                return create_error_response("Error: Invalid tool name string");
+                println!("goose_completion: Extension {} has invalid name string", i);
+                return create_error_response("Error: Invalid extension name string");
             }
         };
         
-        let description = match CStr::from_ptr(ffi_tool.description).to_str() {
-            Ok(s) => s.to_string(),
-            Err(_) => {
-                println!("goose_completion: Tool {} has invalid description string", i);
-                return create_error_response("Error: Invalid tool description string");
+        // Convert optional instructions
+        let instructions = if !ffi_extension.instructions.is_null() {
+            match CStr::from_ptr(ffi_extension.instructions).to_str() {
+                Ok(s) => Some(s.to_string()),
+                Err(_) => {
+                    println!("goose_completion: Extension {} has invalid instructions string", i);
+                    return create_error_response("Error: Invalid extension instructions string");
+                }
             }
+        } else {
+            None
         };
         
-        // Parse input schema JSON
-        let input_schema_str = match CStr::from_ptr(ffi_tool.input_schema_json).to_str() {
-            Ok(s) => s,
-            Err(_) => {
-                println!("goose_completion: Tool {} has invalid input schema string", i);
-                return create_error_response("Error: Invalid tool input schema string");
+        // Convert tools
+        let mut rust_tools = Vec::with_capacity(ffi_extension.tool_count);
+        for j in 0..ffi_extension.tool_count {
+            let ffi_tool = &*(ffi_extension.tools.add(j));
+            
+            // Check for null pointers
+            if ffi_tool.name.is_null() || ffi_tool.description.is_null() || ffi_tool.input_schema_json.is_null() {
+                println!("goose_completion: Tool {}.{} has null fields", i, j);
+                return create_error_response("Error: Tool has null name, description, or input schema");
             }
-        };
+            
+            // Convert name and description
+            let tool_name = match CStr::from_ptr(ffi_tool.name).to_str() {
+                Ok(s) => s.to_string(),
+                Err(_) => {
+                    println!("goose_completion: Tool {}.{} has invalid name string", i, j);
+                    return create_error_response("Error: Invalid tool name string");
+                }
+            };
+            
+            let description = match CStr::from_ptr(ffi_tool.description).to_str() {
+                Ok(s) => s.to_string(),
+                Err(_) => {
+                    println!("goose_completion: Tool {}.{} has invalid description string", i, j);
+                    return create_error_response("Error: Invalid tool description string");
+                }
+            };
+            
+            // Parse input schema JSON
+            let input_schema_str = match CStr::from_ptr(ffi_tool.input_schema_json).to_str() {
+                Ok(s) => s,
+                Err(_) => {
+                    println!("goose_completion: Tool {}.{} has invalid input schema string", i, j);
+                    return create_error_response("Error: Invalid tool input schema string");
+                }
+            };
+            
+            let input_schema: Value = match serde_json::from_str(input_schema_str) {
+                Ok(v) => v,
+                Err(e) => {
+                    println!("goose_completion: Tool {}.{} has invalid JSON in input schema: {}", i, j, e);
+                    return create_error_response(&format!("Error parsing tool input schema JSON: {}", e));
+                }
+            };
+            
+            // Use default annotations - read-only and idempotent
+            let annotations = Some(ToolAnnotations {
+                title: None,
+                read_only_hint: true,  // Default to read-only for safety
+                destructive_hint: false,
+                idempotent_hint: true,
+                open_world_hint: true,
+            });
+            
+            println!("goose_completion: Tool {}.{}: name={}, description length={}", i, j, tool_name, description.len());
+            
+            // Create the Tool
+            let tool = Tool::new(tool_name, description, input_schema, annotations);
+            rust_tools.push(tool);
+        }
         
-        let input_schema: Value = match serde_json::from_str(input_schema_str) {
-            Ok(v) => v,
-            Err(e) => {
-                println!("goose_completion: Tool {} has invalid JSON in input schema: {}", i, e);
-                return create_error_response(&format!("Error parsing tool input schema JSON: {}", e));
-            }
-        };
-        
-        // Use default annotations - read-only and idempotent
-        let annotations = Some(ToolAnnotations {
-            title: None,
-            read_only_hint: true,  // Default to read-only for safety
-            destructive_hint: false,
-            idempotent_hint: true,
-            open_world_hint: true,
-        });
-        
-        println!("goose_completion: Tool {}: name={}, description length={}", i, name, description.len());
-        
-        // Create the Tool
-        let tool = Tool::new(name, description, input_schema, annotations);
-        rust_tools.push(tool);
+        // Create the Extension
+        println!("goose_completion: Extension {}: name={}, {} tools", i, name, rust_tools.len());
+        let extension = goose_llm::Extension::new(name, instructions, rust_tools);
+        rust_extensions.push(extension);
     }
 
     // Create model config
@@ -590,19 +641,18 @@ pub unsafe extern "C" fn goose_completion(
         }
         
         if let Some(api_key_value) = &api_key_str {
-            let env_var_name = format!("{}_API_KEY", provider_str.to_uppercase());
+            let env_var_name = format!("{}_TOKEN", provider_str.to_uppercase());
             println!("goose_completion: Setting environment variable: {}", env_var_name);
             std::env::set_var(&env_var_name, api_key_value);
         }
 
-        println!("goose_completion: Calling completion function with {} tools", rust_tools.len());
+        println!("goose_completion: Calling completion function with {} extensions", rust_extensions.len());
         let result = completion(
             provider_str,
             model_config,
             system_preamble_str,
             &rust_messages,
-            &rust_tools,
-            check_tool_approval,
+            &rust_extensions,
         ).await;
         
         println!("goose_completion: Completion function returned: {}", 

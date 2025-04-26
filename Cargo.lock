@@ -2559,8 +2559,12 @@ name = "goose-llm"
 version = "1.0.20"
 dependencies = [
  "anyhow",
+ "chrono",
  "goose",
+ "include_dir",
  "mcp-core",
+ "minijinja",
+ "once_cell",
  "serde",
  "serde_json",
  "tokio",
