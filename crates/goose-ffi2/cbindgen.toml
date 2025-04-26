@@ -1,0 +1,32 @@
+[parse]
+parse_deps = false
+include = ["goose-ffi2"]
+expand = ["goose-ffi2"]
+
+[export]
+item_types = ["structs", "enums", "functions", "constants"]
+exclude = []
+include = []
+renaming_overrides_prefixing = false
+
+[export.rename]
+"GooseFfi2Config" = "goose_config_t"
+"GooseFfi2Extension" = "goose_extension_t"
+"GooseFfi2Message" = "goose_message_t"
+"GooseFfi2Result" = "goose_result_t"
+"ToolDefinition" = "goose_tool_t"
+"ToolParameter" = "goose_parameter_t"
+"MessageRole" = "goose_message_role_t"
+
+[define]
+"target_os = windows" = "GOOSE_WINDOWS"
+"target_os = macos" = "GOOSE_MACOS"
+"target_os = linux" = "GOOSE_LINUX"
+
+[enum]
+rename_variants = "ScreamingSnakeCase"
+prefix_with_name = true
+
+[fn]
+rename_args = "None"
+args = "All"

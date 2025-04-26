@@ -1,0 +1,36 @@
+[package]
+name = "goose-ffi2"
+build = "build.rs"
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "FFI bindings for goose-llm"
+
+[lib]
+name = "goose_ffi2"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+goose = { path = "../goose" }
+goose-llm = { path = "../goose-llm"}
+mcp-core = { path = "../mcp-core" }
+tokio = { version = "1.43", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+once_cell = "1.20.2"
+futures = "0.3"
+libc = "0.2"
+
+[build-dependencies]
+cbindgen = "0.24.0"
+
+[[example]]
+name = "ffi_simple"
+path = "examples/ffi_simple.rs"
+
+[[example]]
+name = "threads"
+path = "examples/threads.rs"
