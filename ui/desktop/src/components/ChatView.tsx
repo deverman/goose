@@ -323,26 +323,6 @@ export default function ChatView({
     return message.content.some((content) => content.type === 'contextLengthExceeded');
   };
 
-  // const handleContextLengthExceeded = async () => {
-  //   // If we already have a summary, use that
-  //   if (summaryContent) {
-  //     return summaryContent;
-  //   }
-  //
-  //   // Otherwise, generate a summary
-  //   const response = await manageContextFromBackend({ messages: messages, manageAction: 'summarize' });
-  //
-  //   // Convert API messages to frontend messages
-  //   const convertedMessages = response.messages.map(apiMessage =>
-  //       convertApiMessageToFrontendMessage(apiMessage)
-  //   );
-  //
-  //   setSummarizedThread(convertedMessages);
-  //
-  //   const summaryMessage = convertedMessages[0].content[0] as TextContent  // to avoid type errors
-  //   return summaryMessage.text;
-  // };
-
   interface ContextLengthExceededHandlerProps {
     onSummaryFetched: (summary: string, convertedMessages: Message[]) => void;
     existingSummary: string;
@@ -477,8 +457,22 @@ export default function ChatView({
   // Function to reset messages with the summarized thread
   const resetMessagesWithSummary = () => {
     if (summarizedThread.length > 0) {
+      // update summarizedThread with some metadata
+      const updatedSummarizedThread = summarizedThread.map((msg) => ({
+        ...msg,
+        display: false,
+        sendToLLM: true,
+      }));
+
+      // update list of messages with other metadata
+      const updatedMessages = messages.map((msg) => ({
+        ...msg,
+        display: true,
+        sendToLLM: false,
+      }));
+
       // Make a copy of the summarized thread
-      const newMessages = [...summarizedThread];
+      const newMessages = [...updatedMessages, ...updatedSummarizedThread];
 
       // Update the messages state with the summarized thread
       setMessages(newMessages);
@@ -501,11 +495,9 @@ export default function ChatView({
   // Filter out standalone tool response messages for rendering
   // They will be shown as part of the tool invocation in the assistant message
   const filteredMessages = messages.filter((message) => {
-    // TODO: use this summarized thread in the chat window
-    if (summarizedThread.length > 0) {
-      // we have a summarized thread
-      console.log('summarized thread has been created --', summarizedThread);
-    }
+    // Only filter out when display is explicitly false
+    if (message.display === false) return false;
+
     // Keep all assistant messages and user messages that aren't just tool responses
     if (message.role === 'assistant') return true;
 
