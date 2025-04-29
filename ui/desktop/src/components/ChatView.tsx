@@ -372,7 +372,6 @@ export default function ChatView({
           const convertedMessages = response.messages.map((apiMessage) =>
             convertApiMessageToFrontendMessage(apiMessage)
           );
-          console.log('convertedMessages', convertedMessages);
 
           const summaryMessage = convertedMessages[0].content[0] as TextContent;
           const summary = summaryMessage.text;
@@ -564,8 +563,6 @@ export default function ChatView({
       fetchSessionTokens();
     }
   }, [chat.id, messages]);
-
-  console.log('message summary', summarizedThread);
 
   return (
     <div className="flex flex-col w-full h-screen items-center justify-center">
