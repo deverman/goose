@@ -104,6 +104,12 @@ export default function ChatView({
     onFinish: async (_message, _reason) => {
       window.electron.stopPowerSaveBlocker();
 
+      setTimeout(() => {
+        if (scrollRef.current?.scrollToBottom) {
+          scrollRef.current.scrollToBottom();
+        }
+      }, 300);
+
       // Disabled askAi calls to save costs
       // const messageText = getTextContent(message);
       // const fetchResponses = await askAi(messageText);
@@ -508,7 +514,7 @@ export default function ChatView({
       if (scrollRef.current?.scrollToBottom) {
         scrollRef.current.scrollToBottom();
       }
-    }, 100);
+    }, 300);
   };
 
   // Filter out standalone tool response messages for rendering
