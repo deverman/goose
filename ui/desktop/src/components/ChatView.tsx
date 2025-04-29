@@ -83,6 +83,14 @@ export default function ChatView({
     setIsSummaryModalOpen(true);
   };
 
+  useEffect(() => {
+    // Log all messages when the component first mounts
+    console.log('Initial messages when resuming session:', chat.messages);
+    window.electron.logInfo(
+      'Initial messages when resuming session: ' + JSON.stringify(chat.messages, null, 2)
+    );
+  }, [chat.messages]); // Empty dependency array means this runs once on mount; TODO: remove dep for testing
+
   // Get recipeConfig directly from appConfig
   const recipeConfig = window.appConfig.get('recipeConfig') as Recipe | null;
 
