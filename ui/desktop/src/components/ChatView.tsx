@@ -63,8 +63,6 @@ export default function ChatView({
   setView: (view: View, viewOptions?: ViewOptions) => void;
   setIsGoosehintsModalOpen: (isOpen: boolean) => void;
 }) {
-  // Existing code...
-
   return (
     <ContextManagerProvider>
       <ChatContent
@@ -105,6 +103,9 @@ function ChatContent({
     closeSummaryModal,
     updateSummary,
     hasContextLengthExceededContent,
+    handleContextLengthExceeded,
+    setupContinuationChat,
+    isContinuationSession,
   } = useContextManager();
 
   useEffect(() => {
@@ -240,19 +241,29 @@ function ChatContent({
     if (content.trim()) {
       setLastInteractionTime(Date.now());
 
-      if (summarizedThread.length > 0) {
-        // First reset the messages with the summary
-        resetMessagesWithSummary(messages, setMessages);
+      if (isContinuationSession && summarizedThread.length > 0) {
+        // Set up a new chat with the summary
+        setupContinuationChat(setChat);
 
-        // Then append the new user message
+        // Then append the new user message after a small delay
         setTimeout(() => {
           append(createUserMessage(content));
           if (scrollRef.current?.scrollToBottom) {
             scrollRef.current.scrollToBottom();
           }
-        }, 150); // Small delay to ensure state updates properly
+        }, 150);
+      } else if (summarizedThread.length > 0) {
+        // Normal summary handling (existing code)
+        resetMessagesWithSummary(messages, setMessages);
+
+        setTimeout(() => {
+          append(createUserMessage(content));
+          if (scrollRef.current?.scrollToBottom) {
+            scrollRef.current.scrollToBottom();
+          }
+        }, 150);
       } else {
-        // Normal flow - just append the message
+        // Normal flow (existing code)
         append(createUserMessage(content));
         if (scrollRef.current?.scrollToBottom) {
           scrollRef.current.scrollToBottom();
@@ -406,6 +417,11 @@ function ChatContent({
 
   return (
     <div className="flex flex-col w-full h-screen items-center justify-center">
+      {process.env.ALPHA && isContinuationSession && (
+          <div className="w-full bg-yellow-100 dark:bg-yellow-900 p-2 text-center text-sm">
+            This is a continuation of a previous session. When you send a message, a new chat will be created with the summarized context.
+          </div>
+      )}
       {/* Loader when generating recipe */}
       {isGeneratingRecipe && <LayingEggLoader />}
       <div className="relative flex items-center h-[36px] w-full">
@@ -448,10 +464,12 @@ function ChatContent({
                     <>
                       {/* Only render GooseMessage if it's not a CLE message (and we are not in alpha mode) */}
                       {process.env.ALPHA && hasContextLengthExceededContent(message) ? (
-                        <ContextLengthExceededHandler
-                          messages={messages}
-                          messageId={message.id ?? message.created.toString()}
-                        />
+                          <ContextLengthExceededHandler
+                              messages={messages}
+                              messageId={message.id ?? message.created.toString()}
+                              chatId={chat.id}
+                              workingDir={window.appConfig.get('GOOSE_WORKING_DIR')}
+                          />
                       ) : (
                         <GooseMessage
                           messageHistoryIndex={chat?.messageHistoryIndex}

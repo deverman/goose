@@ -5,21 +5,30 @@ import { useContextManager } from './ContextManager';
 interface ContextLengthExceededHandlerProps {
   messages: Message[];
   messageId: string;
+  chatId: string;
+  workingDir: string;
 }
 
 export const ContextLengthExceededHandler: React.FC<ContextLengthExceededHandlerProps> = ({
-  messages,
-  messageId,
-}) => {
-  const { fetchSummary, summaryContent, isLoadingSummary, errorLoadingSummary, openSummaryModal } =
-    useContextManager();
+                                                                                            messages,
+                                                                                            messageId,
+                                                                                            chatId,
+                                                                                            workingDir
+                                                                                          }) => {
+  const {
+    summaryContent,
+    isLoadingSummary,
+    errorLoadingSummary,
+    openSummaryModal,
+    handleContextLengthExceeded,
+  } = useContextManager();
 
   const [hasFetchStarted, setHasFetchStarted] = useState(false);
 
   // Find the relevant message to check if it's the latest
   const isCurrentMessageLatest =
-    messageId === messages[messages.length - 1].id ||
-    messageId === messages[messages.length - 1].created.toString();
+      messageId === messages[messages.length - 1]?.id ||
+      messageId === String(messages[messages.length - 1]?.created);
 
   // Only allow interaction for the most recent context length exceeded event
   const shouldAllowSummaryInteraction = isCurrentMessageLatest;
@@ -27,51 +36,73 @@ export const ContextLengthExceededHandler: React.FC<ContextLengthExceededHandler
   // Use a ref to track if we've started the fetch
   const fetchStartedRef = useRef(false);
 
-  useEffect(() => {
-    // Automatically fetch summary if conditions are met
-    if (
-      !summaryContent &&
-      !hasFetchStarted &&
-      shouldAllowSummaryInteraction &&
-      !fetchStartedRef.current
-    ) {
-      setHasFetchStarted(true);
-      fetchStartedRef.current = true;
-      fetchSummary(messages);
-    }
-  }, [fetchSummary, hasFetchStarted, messages, shouldAllowSummaryInteraction, summaryContent]);
+  // Function to trigger the async operation properly
+  const triggerContextLengthExceeded = () => {
+    setHasFetchStarted(true);
+    fetchStartedRef.current = true;
 
-  // Handle retry
+    // Call the async function without awaiting it in useEffect
+    handleContextLengthExceeded(messages, chatId, workingDir).catch(err => {
+      console.error('Error handling context length exceeded:', err);
+    });
+  };
+
+  useEffect(() => {
+    if (
+        !summaryContent &&
+        !hasFetchStarted &&
+        shouldAllowSummaryInteraction &&
+        !fetchStartedRef.current
+    ) {
+      // Use the wrapper function instead of calling the async function directly
+      triggerContextLengthExceeded();
+    }
+  }, [
+    hasFetchStarted,
+    messages,
+    shouldAllowSummaryInteraction,
+    summaryContent,
+    chatId,
+    workingDir
+  ]);
+
+  // Handle retry - Call the async function properly
   const handleRetry = () => {
     if (!shouldAllowSummaryInteraction) return;
-    fetchSummary(messages);
+
+    // Reset states for retry
+    setHasFetchStarted(false);
+    fetchStartedRef.current = false;
+
+    // Trigger the process again
+    triggerContextLengthExceeded();
   };
 
   // Render the notification UI
   return (
-    <div className="flex flex-col items-start mt-1 pl-4">
-      {isLoadingSummary && shouldAllowSummaryInteraction ? (
-        // Only show loading indicator during loading state
-        <div className="flex items-center text-xs text-gray-400">
-          <span className="mr-2">Preparing summary...</span>
-          <span className="animate-spin h-3 w-3 border-2 border-gray-400 rounded-full border-t-transparent"></span>
-        </div>
-      ) : (
-        // Show different UI based on whether it's already handled
-        <>
-          <span className="text-xs text-gray-400 italic">{'Session summarized'}</span>
+      <div className="flex flex-col items-start mt-1 pl-4">
+        {isLoadingSummary && shouldAllowSummaryInteraction ? (
+            // Only show loading indicator during loading state
+            <div className="flex items-center text-xs text-gray-400">
+              <span className="mr-2">Preparing summary...</span>
+              <span className="animate-spin h-3 w-3 border-2 border-gray-400 rounded-full border-t-transparent"></span>
+            </div>
+        ) : (
+            // Show different UI based on whether it's already handled
+            <>
+              <span className="text-xs text-gray-400 italic">{'Session summarized'}</span>
 
-          {/* Only show the button if its last message */}
-          {shouldAllowSummaryInteraction && (
-            <button
-              onClick={() => (errorLoadingSummary ? handleRetry() : openSummaryModal())}
-              className="text-xs text-textStandard hover:text-textSubtle transition-colors mt-1 flex items-center"
-            >
-              {errorLoadingSummary ? 'Retry loading summary' : 'View or edit summary'}
-            </button>
-          )}
-        </>
-      )}
-    </div>
+              {/* Only show the button if its last message */}
+              {shouldAllowSummaryInteraction && (
+                  <button
+                      onClick={() => (errorLoadingSummary ? handleRetry() : openSummaryModal())}
+                      className="text-xs text-textStandard hover:text-textSubtle transition-colors mt-1 flex items-center"
+                  >
+                    {errorLoadingSummary ? 'Retry loading summary' : 'View or edit summary'}
+                  </button>
+              )}
+            </>
+        )}
+      </div>
   );
 };
